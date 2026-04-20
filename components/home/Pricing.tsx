@@ -35,7 +35,7 @@ const PricingCard = ({isFreePlan}: {isFreePlan: boolean}) => {
       <div className="flex flex-col">
         <div>{isFreePlan ? "Free" : "Paid"} Plan</div>
         <h3 id="tier-standard" className="text-blue-500 text-2xl font-extrabold leading-8">
-          {isFreePlan ? "1 Credit" : "5 Credits"}
+          {isFreePlan ? "2 Credits" : "5 Credits"}
         </h3>
         <p className="mt-3 flex items-baseline gap-x-1">
           <span className="line-through text-2xl font-sans text-muted-foreground/70">₹400</span>

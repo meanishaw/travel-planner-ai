@@ -14,7 +14,7 @@ const GeneratePlanButton = () => {
                   text-sm
                   font-semibold rounded-3xl"
     >
-      {isAuthenticated ? "Go to Dashboard" : "Try Now - 1 Free Credits"}
+      {isAuthenticated ? "Go to Dashboard" : "Try Now - 2 Free Credits"}
     </Button>
   );
 };
