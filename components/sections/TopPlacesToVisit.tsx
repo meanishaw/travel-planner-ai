@@ -9,8 +9,6 @@ import {DeleteIcon, MapPin, Trash} from "lucide-react";
 import {useEffect, useState} from "react";
 import {Loading} from "@/components/shared/Loading";
 import LocationAutoComplete from "@/components/LocationAutoComplete";
-// import {Autocomplete} from "@react-google-maps/api";
-import Autocomplete from "react-google-autocomplete";
 import {MapProvider} from "@/contexts/MapProvider";
 import {Button} from "@/components/ui/button";
 import {useMutation} from "convex/react";
