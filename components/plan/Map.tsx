@@ -1,82 +1,110 @@
 "use client";
-import {Doc} from "@/convex/_generated/dataModel";
-import {colors, MAPS_DARK_MODE_STYLES} from "@/lib/constants";
-import {GoogleMap, useJsApiLoader, OverlayView, Libraries} from "@react-google-maps/api";
-import {MapPin} from "lucide-react";
-import {useTheme} from "next-themes";
-import {useEffect, useState} from "react";
+import { Doc } from "@/convex/_generated/dataModel";
+import { colors } from "@/lib/constants";
+import { MapPin } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 
 type MapProps = {
-  topPlacesToVisit: (Doc<"plan">["topplacestovisit"][number] & {id: string})[] | undefined;
-  selectedPlace: {lat: number; lng: number} | undefined;
+  topPlacesToVisit: (Doc<"plan">["topplacestovisit"][number] & { id: string })[] | undefined;
+  selectedPlace: { lat: number; lng: number } | undefined;
 };
 
-export default function Map({topPlacesToVisit, selectedPlace}: MapProps) {
-  const [mapCenter, setMapCenter] = useState(selectedPlace);
-  const [mapZoom, setMapZoom] = useState(13);
+export default function Map({ topPlacesToVisit, selectedPlace }: MapProps) {
+  const mapRef = useRef<HTMLDivElement>(null);
+  const mapInstanceRef = useRef<any>(null);
+  const markersRef = useRef<any[]>([]);
+  const [isClient, setIsClient] = useState(false);
 
-  const {resolvedTheme} = useTheme();
+  useEffect(() => { setIsClient(true); }, []);
 
+  // Initialize Leaflet map
   useEffect(() => {
-    if (!selectedPlace) return;
-    zoomSelecedPlace(selectedPlace?.lat, selectedPlace?.lng);
+    if (!isClient || !mapRef.current || mapInstanceRef.current) return;
+
+    const initMap = async () => {
+      const L = (await import("leaflet")).default;
+      await import("leaflet/dist/leaflet.css");
+
+      const map = L.map(mapRef.current!, {
+        center: [20, 0],
+        zoom: 2,
+        zoomControl: true,
+      });
+
+      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        attribution: "© OpenStreetMap contributors",
+      }).addTo(map);
+
+      mapInstanceRef.current = map;
+    };
+
+    initMap();
+
+    return () => {
+      if (mapInstanceRef.current) {
+        mapInstanceRef.current.remove();
+        mapInstanceRef.current = null;
+      }
+    };
+  }, [isClient]);
+
+  // Update markers when places change
+  useEffect(() => {
+    if (!mapInstanceRef.current || !topPlacesToVisit?.length) return;
+
+    const updateMarkers = async () => {
+      const L = (await import("leaflet")).default;
+      const map = mapInstanceRef.current;
+
+      // Remove old markers
+      markersRef.current.forEach((m) => m.remove());
+      markersRef.current = [];
+
+      // Add new markers
+      topPlacesToVisit.forEach((place, index) => {
+        const color = colors[index % 6];
+        const icon = L.divIcon({
+          className: "",
+          html: `<div style="
+            background:${color};
+            width:32px;height:32px;
+            border-radius:50% 50% 50% 0;
+            transform:rotate(-45deg);
+            border:4px solid white;
+            box-shadow:2px 2px 4px rgba(0,0,0,0.4);
+            display:flex;align-items:center;justify-content:center;
+          "><span style="transform:rotate(45deg);color:white;font-weight:bold;font-size:12px">${index + 1}</span></div>`,
+          iconSize: [32, 32],
+          iconAnchor: [16, 32],
+        });
+
+        const marker = L.marker([place.coordinates.lat, place.coordinates.lng], { icon }).addTo(map);
+        marker.bindPopup(`<b>${place.name}</b>`);
+        markersRef.current.push(marker);
+      });
+
+      // Fit map to all markers
+      const bounds = L.latLngBounds(topPlacesToVisit.map((p) => [p.coordinates.lat, p.coordinates.lng]));
+      map.fitBounds(bounds, { padding: [40, 40] });
+    };
+
+    updateMarkers();
+  }, [topPlacesToVisit]);
+
+  // Pan to selected place
+  useEffect(() => {
+    if (!mapInstanceRef.current || !selectedPlace) return;
+    mapInstanceRef.current.setView([selectedPlace.lat, selectedPlace.lng], 14, { animate: true });
   }, [selectedPlace]);
 
-  const zoomSelecedPlace = (lat: number, lng: number) => {
-    setMapCenter({lat, lng});
-    setMapZoom(16);
-  };
-
-  return topPlacesToVisit && topPlacesToVisit?.length > 0 ? (
-    <GoogleMap
-      mapContainerStyle={{height: "100%", width: "100%"}}
-      center={mapCenter}
-      zoom={mapZoom}
-      options={{
-        styles: resolvedTheme === "dark" ? MAPS_DARK_MODE_STYLES : [],
-        disableDefaultUI: false,
-        clickableIcons: true,
-        scrollwheel: true,
-      }}
-    >
-      {topPlacesToVisit?.map((place, index) => (
-        <OverlayView
-          position={place.coordinates}
-          key={place.id}
-          mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}
-        >
-          <MapPinMarker index={index} />
-        </OverlayView>
-      ))}
-    </GoogleMap>
-  ) : (
-    <div className="w-full h-full flex flex-col gap-2 justify-center items-center bg-background text-balance px-2 text-center">
-      <MapPin className="h-20 w-20" />
-      <span>Search and select a lcoation to add to places to visit</span>
-    </div>
-  );
-}
-
-const MapPinMarker = ({index}: {index: number}) => {
-  return (
-    <div
-      aria-label="Map marker"
-      className="mapboxgl-marker"
-      role="button"
-      aria-expanded="false"
-      style={{
-        opacity: 1,
-        pointerEvents: "auto",
-      }}
-    >
-      <div style={{transform: "none"}}>
-        <div
-          className="absolute flex h-[32px] w-[32px] rotate-[-45deg] items-center justify-center rounded-full !rounded-bl-none border-4 border-solid border-white p-1 shadow-[2px_2px_2px_-1px_rgba(0,0,0,0.43)]"
-          style={{backgroundColor: colors[index % 6]}}
-        >
-          <p className="w-[10px] rotate-[45deg] text-base font-bold text-white">{index + 1}</p>
-        </div>
+  if (!topPlacesToVisit?.length) {
+    return (
+      <div className="w-full h-full flex flex-col gap-2 justify-center items-center bg-background text-balance px-2 text-center">
+        <MapPin className="h-20 w-20" />
+        <span>Search and select a location to add to places to visit</span>
       </div>
-    </div>
-  );
-};
+    );
+  }
+
+  return <div ref={mapRef} style={{ height: "100%", width: "100%" }} />;
+}
