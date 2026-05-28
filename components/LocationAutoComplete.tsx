@@ -30,11 +30,7 @@ const LocationAutoComplete = ({ planId, addNewPlaceToTopPlaces }: LocationAutoCo
   const updatePlaceToVisit = useMutation(api.plan.updatePlaceToVisit);
 
   const fetchPredictions = async (input: string) => {
-    if (!input) {
-      setPredictions([]);
-      setShowResults(false);
-      return;
-    }
+    if (!input) { setPredictions([]); setShowResults(false); return; }
     setIsLoading(true);
     try {
       const res = await fetch(`/api/places?input=${encodeURIComponent(input)}`);
@@ -55,38 +51,25 @@ const LocationAutoComplete = ({ planId, addNewPlaceToTopPlaces }: LocationAutoCo
     if (debounceTimer.current) clearTimeout(debounceTimer.current);
     if (value) {
       debounceTimer.current = setTimeout(() => fetchPredictions(value), 300);
-      setShowResults(true);
     } else {
-      setPredictions([]);
-      setShowResults(false);
+      setPredictions([]); setShowResults(false);
     }
   };
 
-  const handleSelectItem = async (e: MouseEvent<HTMLLIElement>, placeId: string) => {
+  const handleSelectItem = async (e: MouseEvent<HTMLLIElement>, placeId: string, description: string) => {
     e.stopPropagation();
     setShowResults(false);
     setIsSaving(true);
     const { dismiss } = toast({ description: "Adding the selected place!" });
-
     try {
-      // Fetch place details via our API route
       const res = await fetch(`/api/places?placeId=${encodeURIComponent(placeId)}`);
       const data = await res.json();
       const result = data.result;
-
-      const lat = result?.geometry?.location?.lat;
-      const lng = result?.geometry?.location?.lng;
-      const name = result?.name;
-
-      if (!lat || !lng || !name) return;
-
-      await updatePlaceToVisit({
-        placeName: name,
-        lat,
-        lng,
-        planId: planId as Id<"plan">,
-      });
-
+      const lat = result?.lat;
+      const lng = result?.lng;
+      const name = result?.name || description;
+      if (!lat || !lng) throw new Error("No coordinates");
+      await updatePlaceToVisit({ placeName: name, lat, lng, planId: planId as Id<"plan"> });
       setSearchQuery("");
       dismiss();
       addNewPlaceToTopPlaces(lat, lng, name);
@@ -111,27 +94,19 @@ const LocationAutoComplete = ({ planId, addNewPlaceToTopPlaces }: LocationAutoCo
           onBlur={() => setShowResults(false)}
         />
         {isLoading ? (
-          <div className="absolute right-3 top-0 h-full flex items-center">
-            <Loading className="w-6 h-6" />
-          </div>
+          <div className="absolute right-3 top-0 h-full flex items-center"><Loading className="w-6 h-6" /></div>
         ) : (
-          <div className="absolute right-3 top-0 h-full flex items-center">
-            <Search className="w-4 h-4" />
-          </div>
+          <div className="absolute right-3 top-0 h-full flex items-center"><Search className="w-4 h-4" /></div>
         )}
       </div>
       {showResults && predictions.length > 0 && (
-        <div
-          className="absolute w-full mt-2 shadow-md rounded-xl p-1 bg-background max-h-80 overflow-auto z-50"
-          onMouseDown={(e) => e.preventDefault()}
-        >
+        <div className="absolute w-full mt-2 shadow-md rounded-xl p-1 bg-background max-h-80 overflow-auto z-50"
+          onMouseDown={(e) => e.preventDefault()}>
           <ul className="w-full flex flex-col gap-2" onMouseDown={(e) => e.preventDefault()}>
             {predictions.map((item) => (
-              <li
-                className="cursor-pointer border-b flex justify-between items-center hover:bg-muted hover:rounded-lg px-1 py-2 text-sm"
-                onClick={(e) => handleSelectItem(e, item.place_id)}
-                key={item.place_id}
-              >
+              <li className="cursor-pointer border-b flex justify-between items-center hover:bg-muted hover:rounded-lg px-1 py-2 text-sm"
+                onClick={(e) => handleSelectItem(e, item.place_id, item.description)}
+                key={item.place_id}>
                 {item.description}
               </li>
             ))}
