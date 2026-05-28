@@ -3,6 +3,7 @@ import { Doc } from "@/convex/_generated/dataModel";
 import { colors } from "@/lib/constants";
 import { MapPin } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import "leaflet/dist/leaflet.css";
 
 type MapProps = {
   topPlacesToVisit: (Doc<"plan">["topplacestovisit"][number] & { id: string })[] | undefined;
@@ -17,13 +18,11 @@ export default function Map({ topPlacesToVisit, selectedPlace }: MapProps) {
 
   useEffect(() => { setIsClient(true); }, []);
 
-  // Initialize Leaflet map
   useEffect(() => {
     if (!isClient || !mapRef.current || mapInstanceRef.current) return;
 
     const initMap = async () => {
       const L = (await import("leaflet")).default;
-      await import("leaflet/dist/leaflet.css");
 
       const map = L.map(mapRef.current!, {
         center: [20, 0],
@@ -48,7 +47,6 @@ export default function Map({ topPlacesToVisit, selectedPlace }: MapProps) {
     };
   }, [isClient]);
 
-  // Update markers when places change
   useEffect(() => {
     if (!mapInstanceRef.current || !topPlacesToVisit?.length) return;
 
@@ -56,24 +54,14 @@ export default function Map({ topPlacesToVisit, selectedPlace }: MapProps) {
       const L = (await import("leaflet")).default;
       const map = mapInstanceRef.current;
 
-      // Remove old markers
       markersRef.current.forEach((m) => m.remove());
       markersRef.current = [];
 
-      // Add new markers
       topPlacesToVisit.forEach((place, index) => {
         const color = colors[index % 6];
         const icon = L.divIcon({
           className: "",
-          html: `<div style="
-            background:${color};
-            width:32px;height:32px;
-            border-radius:50% 50% 50% 0;
-            transform:rotate(-45deg);
-            border:4px solid white;
-            box-shadow:2px 2px 4px rgba(0,0,0,0.4);
-            display:flex;align-items:center;justify-content:center;
-          "><span style="transform:rotate(45deg);color:white;font-weight:bold;font-size:12px">${index + 1}</span></div>`,
+          html: `<div style="background:${color};width:32px;height:32px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);border:4px solid white;box-shadow:2px 2px 4px rgba(0,0,0,0.4);display:flex;align-items:center;justify-content:center;"><span style="transform:rotate(45deg);color:white;font-weight:bold;font-size:12px">${index + 1}</span></div>`,
           iconSize: [32, 32],
           iconAnchor: [16, 32],
         });
@@ -83,7 +71,6 @@ export default function Map({ topPlacesToVisit, selectedPlace }: MapProps) {
         markersRef.current.push(marker);
       });
 
-      // Fit map to all markers
       const bounds = L.latLngBounds(topPlacesToVisit.map((p) => [p.coordinates.lat, p.coordinates.lng]));
       map.fitBounds(bounds, { padding: [40, 40] });
     };
@@ -91,7 +78,6 @@ export default function Map({ topPlacesToVisit, selectedPlace }: MapProps) {
     updateMarkers();
   }, [topPlacesToVisit]);
 
-  // Pan to selected place
   useEffect(() => {
     if (!mapInstanceRef.current || !selectedPlace) return;
     mapInstanceRef.current.setView([selectedPlace.lat, selectedPlace.lng], 14, { animate: true });
