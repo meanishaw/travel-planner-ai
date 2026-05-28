@@ -14,12 +14,10 @@ export default function Map({ topPlacesToVisit, selectedPlace }: MapProps) {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<any>(null);
   const markersRef = useRef<any[]>([]);
-  const [isClient, setIsClient] = useState(false);
 
-  useEffect(() => { setIsClient(true); }, []);
-
+  // Initialize map once
   useEffect(() => {
-    if (!isClient || !mapRef.current || mapInstanceRef.current) return;
+    if (!mapRef.current || mapInstanceRef.current) return;
 
     const initMap = async () => {
       const L = (await import("leaflet")).default;
@@ -35,6 +33,11 @@ export default function Map({ topPlacesToVisit, selectedPlace }: MapProps) {
       }).addTo(map);
 
       mapInstanceRef.current = map;
+
+      // If places already loaded, render them immediately
+      if (topPlacesToVisit?.length) {
+        renderMarkers(L, map, topPlacesToVisit);
+      }
     };
 
     initMap();
@@ -45,42 +48,66 @@ export default function Map({ topPlacesToVisit, selectedPlace }: MapProps) {
         mapInstanceRef.current = null;
       }
     };
-  }, [isClient]);
+  }, []);
 
+  const renderMarkers = async (L: any, map: any, places: typeof topPlacesToVisit) => {
+    if (!places?.length) return;
+
+    // Clear old markers
+    markersRef.current.forEach((m) => m.remove());
+    markersRef.current = [];
+
+    places.forEach((place, index) => {
+      const color = colors[index % 6];
+      const icon = L.divIcon({
+        className: "",
+        html: `<div style="
+          background:${color};
+          width:32px;height:32px;
+          border-radius:50% 50% 50% 0;
+          transform:rotate(-45deg);
+          border:4px solid white;
+          box-shadow:2px 2px 4px rgba(0,0,0,0.4);
+          display:flex;align-items:center;justify-content:center;
+        "><span style="transform:rotate(45deg);color:white;font-weight:bold;font-size:12px">${index + 1}</span></div>`,
+        iconSize: [32, 32],
+        iconAnchor: [16, 32],
+      });
+
+      const marker = L.marker(
+        [place.coordinates.lat, place.coordinates.lng],
+        { icon }
+      ).addTo(map);
+      marker.bindPopup(`<b>${place.name}</b>`);
+      markersRef.current.push(marker);
+    });
+
+    // Fit map to show all markers
+    const bounds = L.latLngBounds(
+      places.map((p) => [p.coordinates.lat, p.coordinates.lng])
+    );
+    map.fitBounds(bounds, { padding: [50, 50] });
+  };
+
+  // Update markers when places change
   useEffect(() => {
     if (!mapInstanceRef.current || !topPlacesToVisit?.length) return;
 
-    const updateMarkers = async () => {
+    const update = async () => {
       const L = (await import("leaflet")).default;
-      const map = mapInstanceRef.current;
-
-      markersRef.current.forEach((m) => m.remove());
-      markersRef.current = [];
-
-      topPlacesToVisit.forEach((place, index) => {
-        const color = colors[index % 6];
-        const icon = L.divIcon({
-          className: "",
-          html: `<div style="background:${color};width:32px;height:32px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);border:4px solid white;box-shadow:2px 2px 4px rgba(0,0,0,0.4);display:flex;align-items:center;justify-content:center;"><span style="transform:rotate(45deg);color:white;font-weight:bold;font-size:12px">${index + 1}</span></div>`,
-          iconSize: [32, 32],
-          iconAnchor: [16, 32],
-        });
-
-        const marker = L.marker([place.coordinates.lat, place.coordinates.lng], { icon }).addTo(map);
-        marker.bindPopup(`<b>${place.name}</b>`);
-        markersRef.current.push(marker);
-      });
-
-      const bounds = L.latLngBounds(topPlacesToVisit.map((p) => [p.coordinates.lat, p.coordinates.lng]));
-      map.fitBounds(bounds, { padding: [40, 40] });
+      renderMarkers(L, mapInstanceRef.current, topPlacesToVisit);
     };
-
-    updateMarkers();
+    update();
   }, [topPlacesToVisit]);
 
+  // Pan to selected place when clicked
   useEffect(() => {
     if (!mapInstanceRef.current || !selectedPlace) return;
-    mapInstanceRef.current.setView([selectedPlace.lat, selectedPlace.lng], 14, { animate: true });
+    mapInstanceRef.current.setView(
+      [selectedPlace.lat, selectedPlace.lng],
+      14,
+      { animate: true }
+    );
   }, [selectedPlace]);
 
   if (!topPlacesToVisit?.length) {
